@@ -3,7 +3,11 @@ Author: RedFantom
 License: GNU GPLv3
 Copyright (c) 2017-2018 RedFantom
 """
+# Standard Library
+import os
+# Project Modules
 from ._tkinter import tk, ttk
+from ._utils import get_fonts_directory
 from ._widget import ThemedWidget
 
 
@@ -25,6 +29,11 @@ class ThemedTk(tk.Tk, ThemedWidget):
       Simply sets the background color of the Tkinter window to the
       default TFrame background color specified by the theme.
     """
+
+    FONTS = {
+        "adapta": "roboto"
+    }
+
     def __init__(self, *args, **kwargs):
         """
         :param theme: Theme to set upon initialization. If theme is not
@@ -39,6 +48,12 @@ class ThemedTk(tk.Tk, ThemedWidget):
         tk.Tk.__init__(self, *args, **kwargs)
         # Initialize as ThemedWidget
         ThemedWidget.__init__(self, self.tk)
+        # Attempt to load extrafont and fonts in ./fonts
+        try:
+            self._load_fonts()
+            self.font_support = True
+        except (tk.TclError, ImportError):
+            self.font_support = False
         # Set initial theme
         if theme is not None and theme in self.get_themes():
             self.set_theme(theme, toplevel, background)
@@ -47,11 +62,14 @@ class ThemedTk(tk.Tk, ThemedWidget):
     def set_theme(self, theme_name, toplevel=False, background=False):
         """Redirect the set_theme call to also set Tk background color"""
         ThemedWidget.set_theme(self, theme_name)
-        color = ttk.Style(self).lookup("TFrame", "background", default="white")
+        style = ttk.Style(self)
+        color = style.lookup("TFrame", "background", default="white")
         if background is True:
             self.config(background=color)
         if toplevel is True:
             self._setup_toplevel_hook(color)
+        if theme_name in self.FONTS and self.font_support:
+            style.configure(".", font=self.fonts[theme_name])
 
     def _setup_toplevel_hook(self, color):
         """Setup Toplevel.__init__ hook for background color"""
@@ -60,3 +78,16 @@ class ThemedTk(tk.Tk, ThemedWidget):
             self.__init__toplevel(*args, **kwargs)
 
         tk.Toplevel.__init__ = __toplevel__
+
+    def _load_fonts(self):
+        """Load the custom fonts using pyglet if it is available"""
+        import tkextrafont
+        tkextrafont.load_extrafont(self)
+        fonts_path = get_fonts_directory()
+        for folder in os.listdir(fonts_path):
+            font_path = os.path.join(fonts_path, folder)
+            for file in os.listdir(font_path):
+                if not file.endswith(".ttf"):
+                    continue
+                self.load_font(os.path.join(font_path, file))
+        return True
