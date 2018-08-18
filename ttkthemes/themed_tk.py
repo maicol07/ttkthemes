@@ -40,10 +40,13 @@ class ThemedTk(tk.Tk, ThemedWidget):
             available, fails silently.
         :param toplevel: Control Toplevel background color option
         :param background: Control Tk background color option
+        :param fonts: Whether to enable the automatic change of default
+            font selected for a theme
         """
         theme = kwargs.pop("theme", None)
         toplevel = kwargs.pop("toplevel", False)
         background = kwargs.pop("background", False)
+        fonts = kwargs.pop("fonts", False)
         # Initialize as tk.Tk
         tk.Tk.__init__(self, *args, **kwargs)
         # Initialize as ThemedWidget
@@ -51,7 +54,7 @@ class ThemedTk(tk.Tk, ThemedWidget):
         # Attempt to load extrafont and fonts in ./fonts
         try:
             self._load_fonts()
-            self.font_support = True
+            self.font_support = True and fonts
         except (tk.TclError, ImportError):
             self.font_support = False
         # Set initial theme
@@ -69,7 +72,7 @@ class ThemedTk(tk.Tk, ThemedWidget):
         if toplevel is True:
             self._setup_toplevel_hook(color)
         if theme_name in self.FONTS and self.font_support:
-            style.configure(".", font=self.fonts[theme_name])
+            style.configure(".", font=self.FONTS[theme_name])
 
     def _setup_toplevel_hook(self, color):
         """Setup Toplevel.__init__ hook for background color"""
@@ -80,7 +83,7 @@ class ThemedTk(tk.Tk, ThemedWidget):
         tk.Toplevel.__init__ = __toplevel__
 
     def _load_fonts(self):
-        """Load the custom fonts using pyglet if it is available"""
+        """Load the custom fonts using tkextrafonts if it is available"""
         import tkextrafont
         tkextrafont.load_extrafont(self)
         fonts_path = get_fonts_directory()
@@ -89,5 +92,11 @@ class ThemedTk(tk.Tk, ThemedWidget):
             for file in os.listdir(font_path):
                 if not file.endswith(".ttf"):
                     continue
-                self.load_font(os.path.join(font_path, file))
-        return True
+                font = os.path.join(font_path, file)
+                if not self.font_info(font):
+                    print("Font not available: {}".format(file))
+                    continue
+                try:
+                    self.load_font(font)
+                except tk.TclError as e:
+                    continue
